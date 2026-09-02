@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zarnet — WiFi Access</title>
+<script src="config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0B1120;--surface:#131B2E;--lime:#B6FF3C;--blue:#4F8CFF;--text:#F5F7FA;--muted:#8A93A6;--line:#26314D;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;min-height:100vh;}
+  .wrap{max-width:960px;margin:0 auto;padding:24px;}
+  .logo{display:flex;align-items:center;gap:10px;font-family:'Space Grotesk';font-weight:700;font-size:1.2rem;}
+  .bars{display:inline-flex;align-items:flex-end;gap:3px;height:16px;}
+  .bars i{display:block;width:3px;background:var(--lime);border-radius:1px;}
+  .bars i:nth-child(1){height:5px;}.bars i:nth-child(2){height:9px;}.bars i:nth-child(3){height:13px;}.bars i:nth-child(4){height:16px;background:var(--blue);}
+  header{display:flex;justify-content:space-between;align-items:center;margin-bottom:40px;}
+  .hero{text-align:center;padding:32px 0 40px;}
+  .hero h1{font-family:'Space Grotesk';font-size:clamp(1.8rem,4vw,2.6rem);margin-bottom:10px;}
+  .hero p{color:var(--muted);font-size:1.02rem;max-width:520px;margin:0 auto;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-top:32px;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;display:flex;flex-direction:column;gap:10px;}
+  .card h3{font-family:'Space Grotesk';font-size:1.05rem;}
+  .price{font-family:'IBM Plex Mono';font-size:1.7rem;color:var(--lime);}
+  .price span{font-size:.8rem;color:var(--muted);font-family:'Inter';}
+  .meta{color:var(--muted);font-size:.85rem;line-height:1.6;}
+  a.btn{display:block;text-align:center;margin-top:auto;padding:12px;border-radius:10px;background:var(--lime);color:#0B1120;font-weight:600;text-decoration:none;font-size:.92rem;}
+  .status{text-align:center;color:var(--muted);padding:60px 0;}
+  footer{text-align:center;color:var(--muted);font-size:.8rem;padding:40px 0 20px;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo"><span class="bars"><i></i><i></i><i></i><i></i></span> <span id="brandName">Zarnet</span></div>
+    </header>
+
+    <div class="hero">
+      <h1 id="heroTitle">Get connected in seconds</h1>
+      <p>Buy a voucher, pay with your Solana wallet, and you're online — no accounts, no contracts.</p>
+    </div>
+
+    <div id="pricingGrid" class="grid"></div>
+    <div id="statusMsg" class="status" style="display:none;"></div>
+
+    <footer>Powered by Zarnet</footer>
+  </div>
+
+<script>
+const API = window.ZARNET_API_BASE;
+const params = new URLSearchParams(location.search);
+// The site slug this portal belongs to. In production this is baked into
+// the URL Omada is configured to redirect to for that site (or hardcode it
+// per deployment) — for local testing, pass ?site=demo.
+const SITE = params.get('site') || 'demo';
+
+function zar(cents) {
+  return `R${(cents / 100).toFixed(2)}`;
+}
+function friendlyDuration(hours) {
+  if (hours >= 720) return `${Math.round(hours / 720)} month${hours > 720 ? 's' : ''}`;
+  if (hours >= 24) return `${Math.round(hours / 24)} day${hours > 24 ? 's' : ''}`;
+  return `${hours}h`;
+}
+
+async function load() {
+  const grid = document.getElementById('pricingGrid');
+  const statusEl = document.getElementById('statusMsg');
+  try {
+    const res = await fetch(`${API}/sites/${encodeURIComponent(SITE)}/public`);
+    if (!res.ok) throw new Error('site not found');
+    const data = await res.json();
+
+    document.getElementById('brandName').textContent = data.site.brand_logo_text || data.site.name;
+    document.title = `${data.site.name} — WiFi Access`;
+    if (data.site.brand_accent_color) {
+      document.documentElement.style.setProperty('--lime', data.site.brand_accent_color);
+    }
+    document.getElementById('heroTitle').textContent = `Get connected at ${data.site.name}`;
+
+    if (data.packages.length === 0) {
+      statusEl.style.display = 'block';
+      statusEl.textContent = 'No packages configured for this site yet.';
+      return;
+    }
+
+    grid.innerHTML = data.packages.map((p) => `
+      <div class="card">
+        <h3>${p.name}</h3>
+        <div class="price">${zar(p.price_zar_cents)} <span>/ ${friendlyDuration(p.duration_hours)}</span></div>
+        <div class="meta">${p.device_limit} device${p.device_limit > 1 ? 's' : ''} · ${p.speed_mbps}Mbps</div>
+        <a class="btn" href="purchase.html?site=${encodeURIComponent(SITE)}&package=${encodeURIComponent(p.slug)}">Buy voucher</a>
+      </div>
+    `).join('');
+  } catch (err) {
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Could not load pricing. Is the Zarnet backend running and reachable?';
+  }
+}
+
+load();
+</script>
+</body>
+</html>
